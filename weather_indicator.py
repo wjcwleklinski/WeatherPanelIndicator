@@ -10,24 +10,25 @@ from gi.repository import AppIndicator3 as appindicator
 from gi.repository import GLib as glib
 
 
-# TODO: location of the client and autorefreshment
 APPINDICATOR_ID = 'myappindicator'
 
 
 def main():
     indicator = appindicator.Indicator.new(APPINDICATOR_ID,
-                                           "/home/wojtek/PycharmProjects/WeatherPanelIndicator/icons/contrast.png",
+                                           os.getcwd() + "/icons/contrast.png",
                                            appindicator.IndicatorCategory.SYSTEM_SERVICES)
     indicator.set_status(appindicator.IndicatorStatus.ACTIVE)
 
     host_ip = get_ip()
     city, country = get_location(host_ip)
 
-    attributes, temp = weather_data(city, country)  # getting attributes only to build menu
-    indicator.set_menu(build_menu(attributes))
+    attributes, temp, icon_path = weather_data(city, country)  # getting attributes only to build menu
+    menu, menu_items = build_menu(attributes)
+    indicator.set_menu(menu)
     indicator.set_label(temp, "")
+    indicator.set_icon(icon_path)
 
-    glib.timeout_add(600000, change_label, indicator, city, country)  # updating label every 10mins
+    glib.timeout_add(600000, change_label, indicator, city, country, menu_items)  # updating label every 10mins
     gtk.main()  # starts gtk endless loop
 
 
@@ -36,26 +37,27 @@ def main():
 def build_menu(attributes):
     menu = gtk.Menu()
 
+    menu_items = []
     for i in range(0, len(attributes)):
         new_item = gtk.MenuItem(attributes[i])
         menu.append(new_item)
+        menu_items.append(new_item)
 
     item_quit = gtk.MenuItem('Quit')
     item_quit.connect('activate', quit)
     menu.append(item_quit)
     menu.show_all()
-    return menu
+    return menu, menu_items
 
 
 def weather_data(city, country):
-    # TODO: exception handling
     api_address = 'http://api.openweathermap.org/data/2.5/weather?appid=ca428a05cb62822c904d1abb2257ba16&q='
     url = api_address + city
     location = city + ', ' + country
     raw_data_from_api = requests.get(url).json()
     weather = raw_data_from_api['weather'][0]['main']
     weather = 'Sky: ' + weather
-    temperature = round(raw_data_from_api['main']['temp'] - 273.16, 2)
+    temperature = round(raw_data_from_api['main']['temp'] - 273.16, 1)
     temp_to_display = str(temperature) + ' °C'
     temperature = 'Temperature: ' + str(temperature) + ' °C'
     pressure = raw_data_from_api['main']['pressure']
@@ -64,8 +66,9 @@ def weather_data(city, country):
     humidity = 'Humidity: ' + str(humidity) + ' %'
     wind_speed = raw_data_from_api['wind']['speed']
     wind_speed = 'Wind Speed: ' + str(wind_speed) + ' m/s'
+    icon_path = os.getcwd() + "/icons/" + raw_data_from_api['weather'][0]['icon'] + ".png"
     weather_attributes = [location, weather, temperature, pressure, humidity, wind_speed]
-    return weather_attributes, temp_to_display
+    return weather_attributes, temp_to_display, icon_path
 
 
 def get_location(ip_address):
@@ -87,9 +90,12 @@ def get_ip():
     return ip
 
 
-def change_label(indicator, city, country):
-    attributes, temperature = weather_data(city, country)
+def change_label(indicator, city, country, menu_items):
+    attributes, temperature, icon_path = weather_data(city, country)
     indicator.set_label(temperature, "")
+    indicator.set_icon(icon_path)
+    for i in range(0, len(menu_items)):
+        menu_items[i].set_label(str(attributes[i]))
     print(temperature)
     return True
 
