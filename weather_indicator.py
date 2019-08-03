@@ -3,9 +3,6 @@ import signal
 import os
 import requests
 import gi
-import socket
-import fcntl
-import struct
 gi.require_version('Gtk', '3.0')
 gi.require_version('AppIndicator3', '0.1')
 from gi.repository import Gtk as gtk
@@ -14,12 +11,12 @@ from gi.repository import GLib as glib
 
 
 APPINDICATOR_ID = 'myappindicator'
-# REPEAT_TIME_MS = 120000
 REPEAT_TIME_MS = 30000
+KELVINTOCELSIUS = 273.16
 
 
 class WeatherIndicator:
-    attributes_prefix = ['', 'Sky: ', 'Temperature: ', 'Pressure:', 'Humidity: ', 'Wind Speed: ']
+    attributes_prefix = ['', 'Sky: ', 'Temperature: ', 'Pressure: ', 'Humidity: ', 'Wind Speed: ']
 
     def __init__(self, name=None, icon=None):
         self.path = os.path.abspath(os.path.dirname(__file__))
@@ -72,14 +69,18 @@ class WeatherIndicator:
         return city, country
 
     def get_weather_data_from_request(self):
-        host_ip = self.get_ip_from_request()
+        try:
+            host_ip = self.get_ip_from_request()
+        except:
+            print("Unable to get ip from request")
+
         city, country = self.get_location_from_request(host_ip)
         api_address = 'http://api.openweathermap.org/data/2.5/weather?appid=ca428a05cb62822c904d1abb2257ba16&q='
         url = api_address + city
         location = city + ', ' + country
         raw_data_from_api = requests.get(url).json()
         sky = raw_data_from_api['weather'][0]['main']
-        temperature = round(raw_data_from_api['main']['temp'] - 273.16, 1)
+        temperature = round(raw_data_from_api['main']['temp'] - KELVINTOCELSIUS, 1)
         temperature = str(temperature) + ' °C'
         pressure = raw_data_from_api['main']['pressure']
         pressure = str(pressure) + ' hPa'
@@ -111,13 +112,14 @@ class WeatherIndicator:
     def update_indicator(self, menu_items):
         try:
             weather_data, icon_path = self.get_weather_data_from_request()
-            print(city + ", " + country + ", IP: " + str(host_ip))
             self.indicator.set_label(weather_data[2], "")
             self.indicator.set_icon(icon_path)
             for i in range(0, len(weather_data)):
                 menu_items[i].set_label(self.attributes_prefix[i] + weather_data[i])
+
+            print(weather_data[2])
         except:
-            print("Update oopsy.")
+            print("Weather not updated.")
 
         return True
 
